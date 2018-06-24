@@ -14,7 +14,6 @@
  * limitations under the License.
  * =============================================================================
  */
-import * as tf from "@tensorflow/tfjs";
 import * as posenet from "@tensorflow-models/posenet";
 
 const color = "aqua";
@@ -63,6 +62,24 @@ export function drawSkeleton(keypoints, minConfidence, ctx, scale = 1) {
   });
 }
 
+const NOSE = 0;
+const LEFT_EYE = 1;
+const RIGHT_EYE = 2;
+const LEFT_EAR = 3;
+const RIGHT_EAR = 4;
+const LEFT_SHOULDER = 5;
+const RIGHT_SHOULDER = 6;
+const LEFT_ELBOW = 7;
+const RIGHT_ELBOW = 8;
+const LEFT_WRIST = 9;
+const RIGHT_WRIST = 10;
+const LEFT_HIP = 11;
+const RIGHT_HIP = 12;
+const LEFT_KNEE = 13;
+const RIGHT_KNEE = 14;
+const LEFT_ANKLE = 15;
+const RIGHT_ANKLE = 16;
+
 /**
  * Draw pose keypoints onto a canvas
  */
@@ -79,86 +96,134 @@ export function drawKeypoints(keypoints, minConfidence, ctx, scale = 1) {
   }
 }
 
-/**
- * Draw the bounding box of a pose. For example, for a whole person standing
- * in an image, the bounding box will begin at the nose and extend to one of
- * ankles
- */
-export function drawBoundingBox(keypoints, ctx) {
-  const boundingBox = posenet.getBoundingBox(keypoints);
+const distance = (pos1, pos2) =>
+  Math.sqrt((pos1.x - pos2.x) ** 2 + (pos1.y - pos2.y) ** 2);
 
-  ctx.rect(
-    boundingBox.minX,
-    boundingBox.minY,
-    boundingBox.maxX - boundingBox.minX,
-    boundingBox.maxY - boundingBox.minY
+export function drawSheriff(keypoints, minConfidence, ctx, scale) {
+  const fontSize = Math.floor(
+    distance(keypoints[LEFT_EYE].position, keypoints[RIGHT_EYE].position) * 3
+  );
+  ctx.font = `${fontSize}px serif`;
+
+  drawSheriffHead(keypoints, minConfidence, ctx, fontSize);
+  drawSheriffBoots(keypoints, minConfidence, ctx, fontSize);
+  drawSheriffHands(keypoints, minConfidence, ctx, fontSize);
+  drawSheriffBody(keypoints, minConfidence, ctx, fontSize);
+}
+
+function drawSheriffHead(keypoints, minConfidence, ctx, fontSize) {
+  ctx.fillText(
+    "🤠",
+    keypoints[NOSE].position.x - fontSize / 2,
+    keypoints[NOSE].position.y + fontSize / 3
+  );
+}
+
+function drawSheriffBoots(keypoints, minConfidence, ctx, fontSize) {
+  ctx.fillText(
+    "👢",
+    keypoints[LEFT_ANKLE].position.x - fontSize / 2,
+    keypoints[LEFT_ANKLE].position.y + fontSize
+  );
+  ctx.fillText(
+    "👢",
+    keypoints[RIGHT_ANKLE].position.x - fontSize / 2,
+    keypoints[RIGHT_ANKLE].position.y + fontSize
+  );
+}
+
+function drawSheriffHands(keypoints, minConfidence, ctx, fontSize) {
+  ctx.fillText(
+    "👇🏽",
+    keypoints[LEFT_WRIST].position.x - fontSize / 2,
+    keypoints[LEFT_WRIST].position.y + fontSize
+  );
+  ctx.fillText(
+    "👇🏽",
+    keypoints[RIGHT_WRIST].position.x - fontSize / 2,
+    keypoints[RIGHT_WRIST].position.y + fontSize
+  );
+}
+
+function drawSheriffBody(keypoints, minConfidence, ctx, fontSize) {
+  const numEmojisAcrossShoulders = 3;
+  const bodyFontSize = Math.floor(
+    distance(
+      keypoints[LEFT_SHOULDER].position,
+      keypoints[RIGHT_SHOULDER].position
+    ) / numEmojisAcrossShoulders
   );
 
-  ctx.stroke();
-}
+  ctx.font = `${bodyFontSize}px serif`;
 
-/**
- * Converts an arary of pixel data into an ImageData object
- */
-export async function renderToCanvas(a, ctx) {
-  const [height, width] = a.shape;
-  const imageData = new ImageData(width, height);
-
-  const data = await a.data();
-
-  for (let i = 0; i < height * width; ++i) {
-    const j = i * 4;
-    const k = i * 3;
-
-    imageData.data[j + 0] = data[k + 0];
-    imageData.data[j + 1] = data[k + 1];
-    imageData.data[j + 2] = data[k + 2];
-    imageData.data[j + 3] = 255;
+  for (let i = 0; i < numEmojisAcrossShoulders; i++) {
+    ctx.fillText(
+      "💯",
+      keypoints[RIGHT_SHOULDER].position.x + bodyFontSize * i,
+      keypoints[RIGHT_SHOULDER].position.y + bodyFontSize / 2
+    );
   }
 
-  ctx.putImageData(imageData, 0, 0);
-}
+  const limbs = [
+    // left humerus
+    [keypoints[LEFT_SHOULDER], keypoints[LEFT_ELBOW]],
+    // left forearm
+    [keypoints[LEFT_ELBOW], keypoints[LEFT_WRIST]],
+    // right humerus
+    [keypoints[RIGHT_SHOULDER], keypoints[RIGHT_ELBOW]],
+    // right forearm
+    [keypoints[RIGHT_ELBOW], keypoints[RIGHT_WRIST]],
+    // left femur
+    [keypoints[LEFT_HIP], keypoints[LEFT_KNEE]],
+    // left shin
+    [keypoints[LEFT_KNEE], keypoints[LEFT_ANKLE]],
+    // right femur
+    [keypoints[RIGHT_HIP], keypoints[RIGHT_KNEE]],
+    // right shin
+    [keypoints[RIGHT_KNEE], keypoints[RIGHT_ANKLE]],
+    // hip
+    [keypoints[LEFT_HIP], keypoints[RIGHT_HIP]],
+    // torso
+    [
+      {
+        position: {
+          x:
+            (keypoints[LEFT_SHOULDER].position.x +
+              keypoints[RIGHT_SHOULDER].position.x) /
+            2,
+          y:
+            (keypoints[LEFT_SHOULDER].position.y +
+              keypoints[RIGHT_SHOULDER].position.y) /
+            2
+        }
+      },
+      {
+        position: {
+          x:
+            (keypoints[LEFT_HIP].position.x +
+              keypoints[RIGHT_HIP].position.x) /
+            2,
+          y:
+            (keypoints[LEFT_HIP].position.y +
+              keypoints[RIGHT_HIP].position.y) /
+            2
+        }
+      }
+    ]
+  ];
 
-/**
- * Draw an image on a canvas
- */
-export function renderImageToCanvas(image, size, canvas) {
-  canvas.width = size[0];
-  canvas.height = size[1];
-  const ctx = canvas.getContext("2d");
+  limbs.forEach(([fromJoint, toJoint]) => {
+    const limbDist = distance(fromJoint.position, toJoint.position);
+    const numEmojis = limbDist / bodyFontSize;
+    const deltaY = (toJoint.position.y - fromJoint.position.y) / numEmojis;
+    const deltaX = (toJoint.position.x - fromJoint.position.x) / numEmojis;
 
-  ctx.drawImage(image, 0, 0);
-}
-
-/**
- * Draw heatmap values, one of the model outputs, on to the canvas
- * Read our blog post for a description of PoseNet's heatmap outputs
- * https://medium.com/tensorflow/real-time-human-pose-estimation-in-the-browser-with-tensorflow-js-7dd0bc881cd5
- */
-export function drawHeatMapValues(heatMapValues, outputStride, canvas) {
-  const ctx = canvas.getContext("2d");
-  const radius = 5;
-  const scaledValues = heatMapValues.mul(tf.scalar(outputStride, "int32"));
-
-  drawPoints(ctx, scaledValues, radius, color);
-}
-
-/**
- * Used by the drawHeatMapValues method to draw heatmap points on to
- * the canvas
- */
-function drawPoints(ctx, points, radius, color) {
-  const data = points.buffer().values;
-
-  for (let i = 0; i < data.length; i += 2) {
-    const pointY = data[i];
-    const pointX = data[i + 1];
-
-    if (pointX !== 0 && pointY !== 0) {
-      ctx.beginPath();
-      ctx.arc(pointX, pointY, radius, 0, 2 * Math.PI);
-      ctx.fillStyle = color;
-      ctx.fill();
+    for (let i = 0; i < numEmojis; i++) {
+      ctx.fillText(
+        "💯",
+        fromJoint.position.x + deltaX * i,
+        fromJoint.position.y + deltaY * i
+      );
     }
-  }
+  });
 }

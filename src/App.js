@@ -1,6 +1,6 @@
 import React, { Component } from "react";
 import * as posenet from "@tensorflow-models/posenet";
-import { drawKeypoints, drawSkeleton } from "./util/demo_util";
+import { drawKeypoints, drawSkeleton, drawSheriff } from "./util/demo_util";
 
 const isAndroid = () => {
   return /Android/i.test(navigator.userAgent);
@@ -14,11 +14,11 @@ const isMobile = () => {
   return isAndroid() || isiOS();
 };
 
-const VIDEO_HEIGHT = 500;
-const VIDEO_WIDTH = 600;
-
 class App extends Component {
   componentDidMount() {
+    this.height = window.innerHeight;
+    this.width = window.innerWidth;
+
     navigator.getUserMedia =
       navigator.getUserMedia ||
       navigator.webkitGetUserMedia ||
@@ -32,13 +32,13 @@ class App extends Component {
     // since images are being fed from a webcam
     const flipHorizontal = true;
 
-    canvas.width = VIDEO_WIDTH;
-    canvas.height = VIDEO_HEIGHT;
+    canvas.width = this.width;
+    canvas.height = this.height;
 
     const poseDetectionFrame = () => {
       // Scale an image down to a certain factor. Too large of an image will slow
       // down the GPU
-      const imageScaleFactor = 0.5;
+      const imageScaleFactor = 0.25;
       const outputStride = 16;
 
       let poses = [];
@@ -58,11 +58,11 @@ class App extends Component {
           minPoseConfidence = 0.15;
           minPartConfidence = 0.1;
 
-          ctx.clearRect(0, 0, VIDEO_WIDTH, VIDEO_HEIGHT);
+          ctx.clearRect(0, 0, this.width, this.height);
           ctx.save();
           ctx.scale(-1, 1);
-          ctx.translate(-VIDEO_WIDTH, 0);
-          ctx.drawImage(this.video, 0, 0, VIDEO_WIDTH, VIDEO_HEIGHT);
+          ctx.translate(-this.width, 0);
+          ctx.drawImage(this.video, 0, 0, this.width, this.height);
           ctx.restore();
 
           // For each pose (i.e. person) detected in an image, loop through the poses
@@ -70,8 +70,9 @@ class App extends Component {
           // scores
           poses.forEach(({ score, keypoints }) => {
             if (score >= minPoseConfidence) {
-              drawKeypoints(keypoints, minPartConfidence, ctx);
-              drawSkeleton(keypoints, minPartConfidence, ctx);
+              // drawKeypoints(keypoints, minPartConfidence, ctx);
+              // drawSkeleton(keypoints, minPartConfidence, ctx);
+              drawSheriff(keypoints, minPartConfidence, ctx);
             }
           });
 
@@ -90,8 +91,8 @@ class App extends Component {
     }
 
     const video = document.getElementById("video");
-    video.width = VIDEO_WIDTH;
-    video.height = VIDEO_HEIGHT;
+    video.width = this.width;
+    video.height = this.height;
 
     const mobile = isMobile();
 
@@ -101,8 +102,8 @@ class App extends Component {
           audio: false,
           video: {
             facingMode: "user",
-            width: mobile ? undefined : VIDEO_WIDTH,
-            height: mobile ? undefined : VIDEO_HEIGHT
+            width: mobile ? undefined : this.width,
+            height: mobile ? undefined : this.height
           }
         })
         .then(stream => {
